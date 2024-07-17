@@ -1,0 +1,333 @@
+import heapq
+import time
+#Esta es una clase la cual es utilizada como nodo en el algoritmo de A*. Los parametros del constructor son los siguientes:
+# Estado :  Estado actual del tablero (lista de posiciones de las reinas)
+#peso_acomulado: # numero de atacados 
+#heuristica : Es la distancia manjatan entre el tablero actual y el objetivo
+#padre: Es el tablero del cual viene este tablero 
+class Nodo:
+    def __init__(self, estado, peso_acomulado, heuristica, padre=None):
+        self.estado = estado  # Estado actual del tablero (lista de posiciones de las reinas)
+        self.peso_acomulado = peso_acomulado  # numero de atacados 
+        self.heuristica = heuristica  # distancia manjatan 
+        self.padre = padre  # Es utilizado para poder encontrar el camino
+        self.total = heuristica + peso_acomulado
+    #Funcion para poder ordenar las listas usando las bibliotecas heapq. 
+    # Parametros de entrada: El tablero y el otro tablero: son dos listas de 8 elementos 
+    #Salida: self.total < other.total
+    def __lt__(self, other):
+        return self.total < other.total
+
+#Esta función calcula la distancia manjatan entre todas las reinas y las reinas del tablero objetivo. 
+# Parametros de entrada: 
+#   tablero_Act : Tablero del estado actual 
+#   tablero_objetivo : Tablero al cual se quiere llegar 
+#Parametro de salida :
+#   h: Es el valor de la heuristica, es un int 
+
+def heuristica(tablero_Act, tablero_objetivo):
+    h = 0
+    for i in range(8):
+        h = h + abs(tablero_Act[i] - tablero_objetivo[i])   
+    return h
+
+#Esta función es utilizada para pasar la lista de donde estan colocadas las reinas a una matriz o en otras palabras una lista de lisas. 
+# Parametros de entrada:
+# tablero_Act: tablero al que queremos pasar a matriz
+#salida:
+#    matriz : El tablero pero en formato de matriz ( Lista de listas )
+def pasar_matriz(tablero_Act):
+    matriz = [[0 for _ in range(8)] for _ in range(8)]
+    for fila, col in enumerate(tablero_Act):
+        matriz[fila][col] = 1
+    return matriz
+
+# Esta función analísa todo el tablero de forma que va checando cada casilla, primero checa los ataques verticales de las reinas y posteriormente los ataques diagonales.
+#Esta funcion tiene como parametro de entrada le una variable del tablero, el cual es una lista de listas. La funcion regresa una variable de tipo int, la cual es el numero de pares de 
+#reinas que estan siendo atacadas 
+def atacados(tablero_Act):
+    tablero = pasar_matriz(tablero_Act)
+    total = 0
+    for i in range(8):
+        for j in range(i+1, 8):
+            # Verificar si las reinas están en la misma columna o en la misma diagonal
+            if (tablero[i] == tablero[j]): #or (abs(tablero[i] - tablero[j]) == abs(i - j)):
+                total += 1
+    diagonal_derecha = 0
+    diagonal_izquierda = 0
+    for i in range(8):
+        for j in range(8):
+            if tablero[i][j] == 1:
+                #Busqueda a la derecha
+                k = i+1
+                l = j+1
+                while k<8 and l<8:
+                    if tablero[k][l]==1:
+                        diagonal_derecha += 1
+                    k += 1
+                    l += 1
+                #Busqueda a la izquierda
+                k = i+1
+                l = j-1
+                while k<8 and l>=0:
+                    if tablero[k][l]==1:
+                        diagonal_izquierda += 1
+                    k += 1
+                    l -= 1
+    total += diagonal_derecha + diagonal_izquierda
+    return total
+
+"""
+    Implementa el algoritmo A* para resolver el problema de las 8 reinas.
+
+    Parámetros:
+    estado_inicial (lista): Una lista que representa el estado inicial del tablero.
+    objetivo (lista): Una lista que representa el estado objetivo del tablero.
+
+    Retorna:
+    Lista : Una lista que contiene el camino de estados desde el estado inicial hasta el objetivo y el nodo final. 
+    tablero_Act: El tablero de la solución 
+"""
+def AStar8Reinas(estado_inicial, objetivo):
+    T_inicio = time.time()
+    # Inicializar el nodo raíz
+    nodo_raiz = Nodo(estado_inicial, 0, heuristica(estado_inicial, objetivo))
+    frontera = []
+    heapq.heappush(frontera, nodo_raiz)
+    
+
+    while frontera:
+        tablero_Act = heapq.heappop(frontera)
+        
+        if tablero_Act.estado == objetivo:
+            camino = []
+            nodo = tablero_Act
+            while nodo.padre is not None:
+                camino.append(nodo.estado)
+                nodo = nodo.padre
+            camino.append(nodo.estado)
+            T_fin = time.time()
+            tiempo_total = T_fin - T_inicio
+            tiempo_total_milisegundos = tiempo_total * 1000
+            print(f"tiempo: {tiempo_total_milisegundos} ms")
+            return camino[::-1], tablero_Act
+
+        for vecinos in expandir(tablero_Act, objetivo):
+            heapq.heappush(frontera, vecinos)
+    T_fin = time.time()
+    tiempo_total = T_fin - T_inicio
+    tiempo_total_milisegundos = tiempo_total * 1000
+    print(f"tiempo: {tiempo_total_milisegundos} ms")
+    return None
+
+"""
+    Implementa el algoritmo de búsqueda bidireccional A* para resolver el problema de las ocho reinas.
+
+    Parámetros:
+        estado_inicial (list): El estado inicial del tablero (lista de posiciones de las reinas).
+        objetivo (list): El estado objetivo del tablero (lista de posiciones de las reinas).
+
+    Retorna:
+        tuple: Tupla que contiene dos listas:
+            caminoF (list): La lista de estados que representan el camino desde el estado inicial hasta el estado objetivo.
+            caminoB (list): La lista de estados que representan el camino desde el estado objetivo hasta el estado inicial.
+    """
+def MM(estado_inicial, objetivo):
+    # Inicializar el nodo raíz
+    nodo_objetivo = Nodo(objetivo,0,heuristica(objetivo, estado_inicial))
+    nodo_raiz = Nodo(estado_inicial, 0, heuristica(estado_inicial, objetivo))
+    fronteraF = []
+    fronteraB = []
+    visitadosF =[]
+    visitadosB = []
+    heapq.heappush(fronteraF, nodo_raiz)
+    heapq.heappush(fronteraB, nodo_objetivo)
+    
+    while fronteraB or fronteraF:
+    #Front 
+        tablero_ActF = heapq.heappop(fronteraF)
+        visitadosF.append(tablero_ActF.estado)
+        print(visitadosF)
+        
+        if tablero_ActF.estado in visitadosB:
+            print(f"Encontrado {tablero_ActF.estado}")
+            caminoF = []
+            caminoB = []
+            nodoF = tablero_ActF
+            nodoB = None
+            while nodoF.padre is not None:
+                caminoF.append(nodoF.estado)
+                nodoF = nodoF.padre
+            caminoF.append(nodoF.estado) 
+            for nodo in visitadosB:
+                if nodo == tablero_ActF:
+                    nodoB = nodo
+                    while nodoB.padre is not None:
+                        caminoB.append(nodoB.estado)
+                        nodoB = nodoB.padre
+                        caminoB.append(nodoB.estado)   
+            return caminoF[::-1], caminoB        
+
+        for vecinos in expandir(tablero_ActF, objetivo):
+            heapq.heappush(fronteraF, vecinos)
+            
+        tablero_ActB = heapq.heappop(fronteraB)
+        print(f"Estado B: {tablero_ActB.estado}")
+        visitadosB.append(tablero_ActB.estado)
+        print(visitadosB)
+
+        if tablero_ActB.estado in visitadosF:
+            caminoF = []
+            caminoB = []
+            nodoF = None
+            nodoB = tablero_ActB
+            while nodoB.padre is not None:
+                caminoB.append(nodoB.estado)
+                nodoB = nodoB.padre
+            caminoB.append(nodoB.estado) 
+            for nodo in visitadosF:
+                if nodo == tablero_ActF:
+                    nodoF = nodo
+                    while nodoF.padre is not None:
+                        caminoF.append(nodoF.estado)
+                        nodoF = nodoF.padre
+                        caminoF.append(nodoF.estado)   
+            return caminoF[::-1], caminoB    
+
+        for vecinos in expandirB(tablero_ActB, estado_inicial):
+            heapq.heappush(fronteraB, vecinos)
+    return None
+
+def expandirB(tablero_Act, objetivo):
+    Lista_Expandir = []
+    # i fila, j columna
+    tablero_estado = tablero_Act.estado[:]
+    for i in range(8):
+        for j in range(8):
+            if tablero_estado[i] != j:
+                # Crear una copia 
+                aux = tablero_estado[:]  # Se creó una copia del tablero_estado
+                # Mover la reina 
+                aux[i] = j
+                # Calcular el peso y la heurística
+                peso = 0
+                h = heuristicaB(aux, objetivo)
+                # Crear el nuevo nodo
+                aux_nodo = Nodo(aux, peso, h, tablero_Act)
+                Lista_Expandir.append(aux_nodo)
+    return Lista_Expandir
+
+def heuristicaB(tablero_Act, tablero_objetivo):
+    """
+    Calculates a heuristic for the 8-queens problem, prioritizing closer queen placements.
+
+    Args:
+        tablero_Act (list): Current queen positions on the board.
+        tablero_objetivo (list): Target positions for the queens (ideal state).
+
+    Returns:
+        int: Heuristic value representing estimated distance to the goal state.
+    """
+
+    # Calculate distances and prioritize closer placements with a factor of 10
+    distance_list = [abs(queen_act - queen_objetivo) * (10 if i == 0 else 1) 
+        for i, (queen_act, queen_objetivo) in enumerate(zip(tablero_Act, tablero_objetivo))]
+
+    # Calculate total distance (heuristic)
+    heuristic = sum(distance_list)
+
+    return heuristic
+
+"""
+    Expande el nodo actual generando todos los posibles movimientos de las reinas.
+
+    Parámetros:
+    tablero_Act (Nodo): El nodo actual a que se quiere expandir.
+    objetivo (list): Una lista que representa el estado objetivo del tablero.
+
+    Retorna:
+    list: Una lista de nodos que representan los estados vecinos.
+"""
+
+
+def expandir(tablero_Act, objetivo):
+    Lista_Expandir = []
+    # i fila, j columna
+    tablero_estado = tablero_Act.estado[:]
+    for i in range(8):
+        for j in range(8):
+            if tablero_estado[i] != j:
+                # Crear una copia 
+                aux = tablero_estado[:]  # Se creó una copia del tablero_estado
+                # Mover la reina 
+                aux[i] = j
+                # Calcular el peso y la heurística
+                peso = atacados(aux)
+                h = heuristica(aux, objetivo)
+                # Crear el nuevo nodo
+                aux_nodo = Nodo(aux, peso, h, tablero_Act)
+                Lista_Expandir.append(aux_nodo)
+    return Lista_Expandir
+
+def generar_lista():
+    inicio = [0,0,0,0,0,0,0,0]
+    for i in range(8):
+        bandera = True
+        while bandera:
+                print("Elije una casilla del 1 al 8 para colocar a la Reina en la fila " + str(i + 1))
+                inicio[i] = int(input("R: ")) - 1
+                if inicio[i] > 7 or inicio[i] < 0:
+                        print("Casilla invalida vuelve a intentar\n")
+                else:
+                        bandera = False
+    return inicio
+
+    
+    
+
+def menu2():
+    # variables para la ejecución del menu
+    menu = True
+    opcion = None
+
+    current_state, goal_state = [-1], [-1]
+
+    while menu:
+        print("""
+                1) Por defecto
+                2) Generar un estado inicial aleatorio
+                3) Resolver
+                4) Salir
+              """)
+        opcion = int(input('R: '))
+        if opcion == 1:
+            current_state = [0, 0, 0, 0, 0, 0, 0, 0]
+            goal_state = [0, 4, 7, 5, 2, 6, 1, 3]
+
+            
+        elif opcion == 2:
+            current_state = generar_lista()
+            goal_state = [0, 4, 7, 5, 2, 6, 1, 3]
+        elif opcion == 3:
+            # Si no se han ingresado los estados, no se puede resolver
+            if current_state[0] == -1 or goal_state[0] == -1:
+                print('Elija su estado incial y su estado objetivo antes de comenzar')
+                print(current_state)
+            else:
+                print("""Elige el algoritmo a utilizar:
+                1) A*
+                2) DiBFS
+                """)
+                algoritmo = int(input('R: '))
+
+                if algoritmo == 1:
+                    AStar8Reinas(current_state,goal_state)
+                else:
+                    MM(current_state,goal_state)
+        elif opcion == 4:
+            # Sale del menu
+            menu = False
+        else:
+            print("""
+                Opcion Invalida vuelve a intentar
+              """)
