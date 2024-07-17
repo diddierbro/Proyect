@@ -1,0 +1,28 @@
+from sliding import menu3
+from reinas import menu2
+
+def menu_principal():
+    menuu = True
+    opcion = None
+    while menuu:
+        print("""
+                Bienvenido a Puzzle Solver
+              
+                1) Resolver Sliding Puzzle
+                2) Resolver 8 Reinas
+                3) Salir
+              """)
+        opcion = int(input('R: '))
+        if opcion == 1:
+            menu3()
+        elif opcion == 2:
+            menu2()
+        elif opcion == 3:
+            menuu = False
+        else:
+            print("""
+                Opcion Invalida vuelve a intentar
+              """)
+            
+if __name__ == '__main__':
+    menu_principal()
