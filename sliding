@@ -1,0 +1,465 @@
+import copy
+import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import time
+import random
+
+
+# Genera un estado inicial de manera aleatoria
+# Recibe un tamaño de la matriz como parámetro
+def generate_random_state(size: tuple = (3, 3)):
+
+    # Genera un estado objetivo
+    goal_state = np.array([
+        ['1', '2', '3'],
+        ['4', '5', '6'],
+        ['7', '8', '_']
+    ])
+
+    # Hace un nodo con el estado objetivo
+    goal_state = Node(goal_state)
+    current_state = goal_state
+
+    # Genera un estado inicial aleatorio a partir del estado objetivo
+    # moviendo el espacio vacío x veces de manera aleatoria
+    for i in range(9):
+        current_state = random.choice(current_state.get_neighbors())
+
+    # Hace un np array del estado actual
+    current_state = np.array(current_state.state)
+
+    # Regresa el estado actual y el estado objetivo
+    return current_state, goal_state.state
+
+
+# Menu para seleccionar
+
+
+
+
+
+
+class Node:
+    # El nodo conciste de un estado, un identificador, que es el arreglo convertido a un string y el nodo previo
+    def __init__(self, state: list, g: int = 0, f: int = np.Infinity):
+        # El estado es un arreglo de arreglos
+        # Ejemplo:
+        # [['1', '2', '3'],
+        #  ['4', '5', '6'],
+        #  ['7', '8', '_']]
+        self.state = state
+        # El identificador es el estado convertido a un string
+        # para poder marcar los nodos como visitados
+        self.identifier = ''
+        # El nodo previo es el nodo que generó este nodo
+        self.prev = None
+
+    # Genera el identificador para facilitar marcar los nodos como visitados
+    def generate_identifier(self):
+        # Si ya tiene un identificador, no lo vuelve a generar
+        if self.identifier:
+            return
+
+        # Genera el identificador a partir del estado
+        for row in self.state:
+            self.identifier = self.identifier + ''.join(row) + '\n'
+
+    # Imprime el estado de el nodo
+    def print_myself(self):
+        # Imprime el estado
+        print('-' * 10)
+        print(self.state)
+        print('-' * 10)
+
+    # Identifica donde se encuentra el espacio vacío "_", para generar vecinos de acuerdo a estas coordenadas
+    def get_neighbors(self):
+        for i in range(len(self.state)):
+            for j in range(len(self.state)):
+                if self.state[j][i] == '_':
+                    return self.generate_states(i, j)
+
+    # Regresa una lista de posibles estados adyacentes al estado actual
+    # Recibe las coordenadas de la posición del espacio vacío
+    def generate_states(self, i, j):
+        # Lista de posibles estados
+        possible_states = []
+
+        # Genera un estado para cada movimiento posible en el eje x
+        # Si el movimiento es posible, genera un nuevo estado y lo agrega a la lista de posibles estados
+        for x in range(max(i - 1, 0), min(i + 2, len(self.state))):
+            if x != i:
+                new_state = copy.deepcopy(self.state)
+                new_state[j][x], new_state[j][i] = self.state[j][i], self.state[j][x]
+                possible_states.append(Node(new_state))
+
+        # Genera un estado para cada movimiento posible en el eje y
+        # Si el movimiento es posible, genera un nuevo estado y lo agrega a la lista de posibles estados
+        for y in range(max(j - 1, 0), min(j + 2, len(self.state))):
+            if y != j:
+                new_state = copy.deepcopy(self.state)
+                new_state[y][i], new_state[j][i] = self.state[j][i], self.state[y][i]
+                possible_states.append(Node(new_state))
+
+        # Regresa la lista de posibles estados
+        return possible_states
+
+# Función para generar la heurística de un nodo, la genera sumando puntos por cada número mal puesto, ignorando "_"
+
+
+def heuristic(current_node: Node, goal: list):
+    h = 0
+    # Recorre el estado actual y el estado objetivo
+    # Si el número en el estado actual no es igual al número en el estado objetivo y no es "_", suma un punto
+    for i in range(len(current_node.state)):
+        for j in range(len(current_node.state)):
+            if current_node.state[j][i] != goal[j][i] and current_node.state[j][i] != '_':
+                h += 1
+
+    # Regresa la heurística
+    return h
+
+# Algoritmo a*
+# Recibe un estado inicial y un estado objetivo
+
+
+def a_star(start: list, goal: list):
+    # Tiempo de ejecución
+    start_time = time.perf_counter()
+
+    # Crea un nodo con el estado inicial
+    start_node = Node(np.array(start), 0, 0)
+    # Genera el identificador del nodo
+    start_node.generate_identifier()
+
+    # Crea un nodo con el estado objetivo
+    goal_node = Node(np.array(goal))
+    # Genera el identificador del nodo
+    goal_node.generate_identifier()
+
+    # Diccionario para marcar los nodos como visitados
+    visited = {start_node.identifier: False}
+    # Diccionario para guardar la distancia f de cada nodo
+    f_distance = {start_node.identifier: heuristic(start_node, goal)}
+    # Guarda el ultimo nodo visitado para poder imprimir el camino
+    prev = None
+
+    # Cola de prioridad para guardar los nodos a visitar
+    # Cada nodo es una tupla con la distancia f, la distancia g y el nodo
+    priority_queue = [(f_distance[start_node.identifier] + 0, 0, start_node)]
+    # Profundidad del árbol
+    depth = 0
+    # Número de nodos expandidos
+    expanded_nodes = 0
+    # Aristas del grafo
+    edges = []
+
+    # Mientras haya nodos en la cola de prioridad
+    while priority_queue:
+        # Ordena la cola de prioridad de acuerdo a la distancia f
+        priority_queue.sort(key=lambda x: x[0])
+        # Saca el primer nodo de la cola de prioridad
+        current_f, current_g, current_node = priority_queue.pop(0)
+        # Guarda el nodo actual como el nodo previo
+        prev = current_node
+        # Bandera para saber si se expandió el nodo
+        expanded = False
+
+        # Si el nodo actual es el nodo objetivo, termina el ciclo
+        if current_node.identifier == goal_node.identifier:
+            break
+
+        # Si la distancia f del nodo actual es menor a la distancia f del nodo actual, no lo visita
+        # Ya que es posible guardar un camino más corto en la cola de prioridad
+        if f_distance.get(current_node.identifier, np.Infinity) < current_f:
+            continue
+
+        # Si la profundidad actual es mayor a la profundidad, actualiza la profundidad
+        if current_g > depth:
+            depth = current_g
+
+        # Marca el nodo actual como visitado
+        visited[current_node.identifier] = True
+
+        # Recorre los vecinos del nodo actual
+        for neighbor in current_node.get_neighbors():
+            # Genera el identificador del vecino
+            neighbor.generate_identifier()
+
+            # Guarda la arista del grafo
+            edges.append((current_node.identifier, neighbor.identifier))
+
+            # Si el vecino no ha sido visitado
+            if not visited.get(neighbor.identifier, False):
+                # Calcula la distancia acumulada y la distancia f del vecino
+                accumulated_distance = current_g + 1
+
+                # Calcula la distancia f del vecino, con la distancia acumulada y la heurística
+                possible_f = accumulated_distance + heuristic(neighbor, goal)
+
+                # Si la distancia f del vecino es menor a la distancia f del vecino, lo agrega a la cola de prioridad
+                if f_distance.get(neighbor.identifier, np.Infinity) > possible_f:
+                    # Marca el nodo como expandido
+                    expanded = True
+
+                    # Actualiza la distancia f del vecino
+                    f_distance[neighbor.identifier] = possible_f
+
+                    # Hace el nodo padre del vecino al nodo actual
+                    neighbor.prev = current_node
+
+                    # Agrega el vecino a la cola de prioridad
+                    priority_queue.append(
+                        (possible_f, accumulated_distance, neighbor))
+
+        #  Si se expandió el nodo, aumenta el número de nodos expandidos
+        if expanded:
+            expanded_nodes += 1
+
+    # Tiempo de ejecución
+    execution_time = (time.perf_counter() - start_time) * 1000
+
+    # Si no se encontró un camino, regresa None
+    if not prev:
+        return None
+
+    # Arreglo para guardar el camino
+    path = []
+    # Iterador para recorrer el camino
+    iterator = prev
+
+    # Mientras haya nodos en el camino, los agrega al arreglo
+    while iterator:
+        path.insert(0, iterator.identifier)
+        iterator = iterator.prev
+
+    #  Imprime el camino
+    for i, state in enumerate(path):
+        print(f'{i + 1})')
+        print(state, '\n')
+
+    # Regresa el camino, la profundidad, el número de nodos expandidos y el tiempo de ejecución
+    return edges, path, depth, expanded_nodes, start_node.identifier, goal_node.identifier, execution_time
+
+
+def BiDFS(start: list, goal: list):
+    # Tiempo de ejecución
+    start_time = time.perf_counter()
+
+    # Crea un nodo con el estado inicial
+    start_node = Node(np.array(start), 0, 0)
+    # Genera el identificador del nodo
+    start_node.generate_identifier()
+
+    # Crea un nodo con el estado objetivo
+    goal_node = Node(np.array(goal))
+    # Genera el identificador del nodo
+    goal_node.generate_identifier()
+
+    # Diccionario para marcar los nodos como visitados
+    forward_visited = {start_node.identifier: False}
+    backward_visited = {goal_node.identifier: False}
+
+    # diccionario de previos
+    forward_prev = {start_node.identifier: None}
+    backward_prev = {goal_node.identifier: None}
+
+    # Listas para realizar la búsqueda BFS
+    forward = [start_node]
+    backward = [goal_node]
+
+    # Para reconstruir el camino
+    middle = None
+
+    # Número de nodos expandidos
+    expanded_nodes = 0
+    # Aristas del grafo
+    edges = []
+
+    # Mientras haya nodos en la cola de prioridad
+    while forward and backward:
+        # Saca el primer nodo de la cola de prioridad
+        c1 = forward.pop(0)
+        forward_visited[c1.identifier] = True
+
+        # Saca el primer nodo de la cola de prioridad
+        c2 = backward.pop(0)
+        backward_visited[c2.identifier] = True
+
+        # Guarda el nodo actual como el nodo previo
+        expanded = False
+
+        # Recorre los vecinos del nodo actual
+        for neighbor in c1.get_neighbors():
+            # Genera el identificador del vecino
+            neighbor.generate_identifier()
+            edges.append((c1.identifier, neighbor.identifier))
+            # Si el vecino no ha sido visitado
+            if not forward_visited.get(neighbor.identifier, False):
+                forward_prev[neighbor.identifier] = c1.identifier
+                forward.append(neighbor)
+                expanded = True
+
+        # Si se expandió el nodo, aumenta el número de nodos expandidos
+        if expanded:
+            expanded_nodes += 1
+            expanded = False
+
+        # Recorre los vecinos del nodo actual
+        for neighbor in c2.get_neighbors():
+            # Genera el identificador del vecino
+            neighbor.generate_identifier()
+            edges.append((c2.identifier, neighbor.identifier))
+            # Si el vecino no ha sido visitado
+            if not backward_visited.get(neighbor.identifier, False):
+                backward_prev[neighbor.identifier] = c2.identifier
+                backward.append(neighbor)
+                expanded = True
+
+        # Si se expandió el nodo, aumenta el número de nodos expandidos
+        if expanded:
+            expanded_nodes += 1
+
+        # Si el nodo actual es el nodo objetivo, termina el ciclo
+        if backward_visited.get(c1.identifier, False):
+            middle = c1
+            break
+
+        # Si el nodo actual es el nodo objetivo, termina el ciclo
+        if forward_visited.get(c2.identifier, False):
+            middle = c2
+            break
+
+    # Tiempo de ejecución
+    execution_time = (time.perf_counter() - start_time) * 1000
+
+    # Si no se encontró un camino, regresa None
+    if not middle:
+        return None
+
+    # Arreglo para guardar el camino
+    path = []
+
+    # Iterador para recorrer el camino
+    iterator = middle.identifier
+
+    # Mientras haya nodos en el camino, los agrega al arreglo
+    while iterator:
+        path.insert(0, iterator)
+        iterator = forward_prev[iterator]
+
+    # Iterador para recorrer el camino
+    iterator = backward_prev[middle.identifier]
+
+    # Mientras haya nodos en el camino, los agrega al arreglo
+    while iterator:
+        path.append(iterator)
+        iterator = backward_prev[iterator]
+
+    # Imprime el camino
+    return edges, path, None, expanded_nodes, start_node.identifier, goal_node.identifier, execution_time
+
+
+def print_graph(edges, path, depth, expanded_nodes, start, goal, execution_time, name):
+
+    # Crear grafo con library networkx
+    G = nx.Graph()
+
+    # Agregar nodos al grafo
+    G.add_edges_from(edges)
+    # Posiciones de los nodos
+    pos = nx.spring_layout(G, k=5, iterations=100)
+
+    cmap = plt.get_cmap('Reds')
+    norm = mcolors.Normalize(vmin=0, vmax=len(path)-1)
+
+    # Dibujar el grafo
+    nx.draw(
+        G=G,
+        pos=pos,
+        with_labels=True,
+        node_size=1000,
+        font_size=7,
+        font_color='black',
+        font_weight='bold',
+        node_color=[cmap(norm(path.index(node)))
+                    if node in path else 'b' for node in G.nodes()],
+        edge_color='green',
+        width=1.5,
+        alpha=0.7
+    )
+
+    # Mostrar información
+    plt.title(name)
+    plt.text(0.8, 1.5, f'Profundidad: {depth}')
+    plt.text(0.8, 1.4, f'Tiempo de ejecución: {execution_time} segundos')
+    plt.text(0.8, 1.3, f'Nodos expandidos: {expanded_nodes}')
+    plt.text(0.8, 1, f'Inicio:\n {start}')
+    plt.text(0.8, 0.8, f'Objetivo:\n {goal}')
+
+    # Mostrar el grafo
+    plt.show()
+
+def menu3():
+    # variables para la ejecución del menu
+    menu = True
+    opcion = None
+
+    current_state, goal_state = [], []
+
+    while menu:
+        print("""
+                1) Por defecto
+                2) Generar un estado inicial aleatorio
+                3) Resolver
+                4) Salir
+              """)
+        opcion = int(input('R: '))
+        if opcion == 1:
+            current_state = np.array([
+                ['1', '2', '3'],
+                ['7', '4', '6'],
+                ['5', '_', '8']
+            ])
+
+            goal_state = np.array([
+                ['1', '2', '3'],
+                ['4', '5', '6'],
+                ['7', '8', '_']
+            ])
+        elif opcion == 2:
+            # Genera un estado inicial aleatorio
+            current_state, goal_state = generate_random_state()
+        elif opcion == 3:
+            # Si no se han ingresado los estados, no se puede resolver
+            if len(current_state) == 0 or len(goal_state) == 0:
+                print('Elija su estado incial y su estado objetivo antes de comenzar')
+            else:
+                print("""Elige el algoritmo a utilizar:
+                1) A*
+                2) DiBFS
+                """)
+                algoritmo = int(input('R: '))
+
+                if algoritmo == 1:
+                    # Resuelve el puzzle
+                    edges, path, depth, expanded_nodes, start_node, goal_node, execution_time = a_star(
+                        current_state, goal_state)
+                    # Imprime el camino
+                    print_graph(edges, path, depth, expanded_nodes,
+                                start_node, goal_node, execution_time, 'A*')
+                else:
+                    # Resuelve el puzzle
+                    edges, path, depth, expanded_nodes, start_node, goal_node, execution_time = BiDFS(
+                        current_state, goal_state)
+                    # Imprime el camino
+                    print_graph(edges, path, depth, expanded_nodes,
+                                start_node, goal_node, execution_time, 'BiBFS')
+        elif opcion == 4:
+            # Sale del menu
+            menu = False
+        else:
+            print("""
+                Opcion Invalida vuelve a intentar
+              """)
